@@ -5,84 +5,116 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.telephony.SmsManager
-import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import android.content.pm.ServiceInfo
+import android.os.Looper
+import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.*
 
-class JourneyService : Service() {
+class LocationService : Service() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
-    private lateinit var locationCallback: LocationCallback
 
-    private val phoneNumber = "+911234567890" // hardcoded number
+    // Hardcoded number for testing
+    private val phoneNumber = "+919542033846"
 
     override fun onCreate() {
         super.onCreate()
-
+        createNotificationChannel()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
-        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15 * 60 * 1000) // 15 min
-            .setMinUpdateIntervalMillis(15 * 60 * 1000)
-            .build()
-
-        locationCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                val location: Location = result.lastLocation ?: return
-                val latitude = location.latitude
-                val longitude = location.longitude
-
-                val message = "Current Location: https://maps.google.com/?q=$latitude,$longitude"
-
-                if (ActivityCompat.checkSelfPermission(
-                        this@JourneyService,
-                        Manifest.permission.SEND_SMS
-                    ) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    try {
-                        SmsManager.getDefault().sendTextMessage(phoneNumber, null, message, null, null)
-                        Toast.makeText(this@JourneyService, "Location sent", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-        }
-
-        startForeground(1, createNotification())
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, mainLooper)
     }
 
-    private fun createNotification(): Notification {
-        val channelId = "location_channel"
-        val channelName = "Location Tracking"
+    override fun onStartCommand(intent: android.content.Intent?, flags: Int, startId: Int): Int {
+        val notification: Notification = NotificationCompat.Builder(this, "journey_channel")
+            .setContentTitle("Journey Tracker")
+            .setContentText("Tracking your journey…")
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setOngoing(true)
+            .build()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { // Q = API 29
+            startForeground(
+                1,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else {
+            startForeground(1, notification)
+        }
+
+        startLocationUpdates()
+        // For now we’re not doing location updates, just keeping service alive
+        return START_STICKY
+    }
+
+    private fun startLocationUpdates() {
+        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15 * 60 * 1000L) // 15 min
+            .setMinUpdateIntervalMillis(15 * 60 * 1000L)
+            .setWaitForAccurateLocation(false)
+            .build()
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.SEND_SMS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Permissions not granted, stop service
+            stopSelf()
+            return
+        }
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            Looper.getMainLooper()
+        )
+    }
+
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(result: LocationResult) {
+            val location = result.lastLocation ?: return
+            val latitude = location.latitude
+            val longitude = location.longitude
+
+            val message = "Current Location: https://maps.google.com/?q=$latitude,$longitude"
+
+            try {
+                SmsManager.getDefault().sendTextMessage(phoneNumber, null, message, null, null)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    override fun onBind(intent: android.content.Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        super.onDestroy()
+    }
+
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                channelId, channelName, NotificationManager.IMPORTANCE_LOW
+                "journey_channel",
+                "Journey Tracking",
+                NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
-
-        return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Journey Tracking")
-            .setContentText("Location tracking in progress…")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .build()
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onDestroy() {
-        super.onDestroy()
-        fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 }

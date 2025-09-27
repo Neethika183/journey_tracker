@@ -3,16 +3,25 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Location permissions -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- SMS permission -->
     <uses-permission android:name="android.permission.SEND_SMS" />
+
+    <!-- Required from Android 14 (SDK 34) onwards -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
     <!-- Contacts permission -->
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
+  <!--  <uses-permission android:name="android.permission.READ_CONTACTS" />-->
 
     <!-- Declare telephony feature is NOT required -->
-    <uses-feature android:name="android.hardware.telephony" android:required="false"/>
+   <!-- <uses-feature android:name="android.hardware.telephony" android:required="false"/>-->
 
     <application
         android:allowBackup="true"
@@ -35,10 +44,9 @@
         </activity>
         <!-- Add your service -->
         <service
-            android:name=".JourneyService"
-            android:enabled="true"
+            android:name=".LocationService"
             android:exported="false"
-            android:foregroundServiceType="location|dataSync" />
+            android:foregroundServiceType="location" />
     </application>
 
 </manifest>

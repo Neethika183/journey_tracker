@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.tracking.journey"
-    compileSdk = 36
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.tracking.journey"
-        minSdk = 33
-        targetSdk = 36
+        minSdk = 24
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
